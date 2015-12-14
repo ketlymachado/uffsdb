@@ -179,33 +179,65 @@ void setColumnSelect(char **nome) {
     GLOBAL_DATA_SLCT.N++;
 }
 
+void setJoinObjName(char **nome) {
+	GLOBAL_DATA_SLCT.joinObjName = malloc(sizeof(char)*((strlen(*nome)+1)));
+	strcpylower(GLOBAL_DATA_SLCT.joinObjName, *nome);
+	GLOBAL_DATA_SLCT.joinObjName[strlen(*nome)] = '\0';
+}
+
 void setAuxT(char t) {
-	GLOBAL_DATA_SLCT.W.auxT = t;
+	GLOBAL_DATA_SLCT.auxT = t;
 }
 
 void setWhere(int x) {
 	GLOBAL_DATA_SLCT.selecao = x;
 }
 
+void setJoin(int x) {
+	GLOBAL_DATA_SLCT.juncao = x;
+}
+
 void setSelectCondition(int w, char **nome) {
-	if (w == 0) {
-		GLOBAL_DATA_SLCT.W.leftPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
-		if (GLOBAL_DATA_SLCT.W.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.W.leftPredicate, *nome);
-		else strcpy(GLOBAL_DATA_SLCT.W.leftPredicate, *nome);
-		GLOBAL_DATA_SLCT.W.leftPredicate[strlen(*nome)] = '\0';
-		GLOBAL_DATA_SLCT.W.LPT = GLOBAL_DATA_SLCT.W.auxT;
-	}
-	if (w == 1) {
-		GLOBAL_DATA_SLCT.W.operator = malloc(sizeof(char)*(strlen(*nome)+1));
-		strcpylower(GLOBAL_DATA_SLCT.W.operator, *nome);
-		GLOBAL_DATA_SLCT.W.operator[strlen(*nome)] = '\0';
-	}
-	if (w == 2) {
-		GLOBAL_DATA_SLCT.W.rightPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
-		if (GLOBAL_DATA_SLCT.W.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.W.rightPredicate, *nome);
-		else strcpy(GLOBAL_DATA_SLCT.W.rightPredicate, *nome);
-		GLOBAL_DATA_SLCT.W.rightPredicate[strlen(*nome)] = '\0';
-		GLOBAL_DATA_SLCT.W.RPT = GLOBAL_DATA_SLCT.W.auxT;
+	if (GLOBAL_DATA_SLCT.selecao == 1) {
+		if (w == 0) {
+			GLOBAL_DATA_SLCT.W.leftPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
+			if (GLOBAL_DATA_SLCT.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.W.leftPredicate, *nome);
+			else strcpy(GLOBAL_DATA_SLCT.W.leftPredicate, *nome);
+			GLOBAL_DATA_SLCT.W.leftPredicate[strlen(*nome)] = '\0';
+			GLOBAL_DATA_SLCT.W.LPT = GLOBAL_DATA_SLCT.auxT;
+		}
+		if (w == 1) {
+			GLOBAL_DATA_SLCT.W.operator = malloc(sizeof(char)*(strlen(*nome)+1));
+			strcpylower(GLOBAL_DATA_SLCT.W.operator, *nome);
+			GLOBAL_DATA_SLCT.W.operator[strlen(*nome)] = '\0';
+		}
+		if (w == 2) {
+			GLOBAL_DATA_SLCT.W.rightPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
+			if (GLOBAL_DATA_SLCT.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.W.rightPredicate, *nome);
+			else strcpy(GLOBAL_DATA_SLCT.W.rightPredicate, *nome);
+			GLOBAL_DATA_SLCT.W.rightPredicate[strlen(*nome)] = '\0';
+			GLOBAL_DATA_SLCT.W.RPT = GLOBAL_DATA_SLCT.auxT;
+		}
+	} else {
+		if (w == 0) {
+			GLOBAL_DATA_SLCT.J.leftPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
+			if (GLOBAL_DATA_SLCT.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.J.leftPredicate, *nome);
+			else strcpy(GLOBAL_DATA_SLCT.J.leftPredicate, *nome);
+			GLOBAL_DATA_SLCT.J.leftPredicate[strlen(*nome)] = '\0';
+			GLOBAL_DATA_SLCT.J.LPT = GLOBAL_DATA_SLCT.auxT;
+		}
+		if (w == 1) {
+			GLOBAL_DATA_SLCT.J.operator = malloc(sizeof(char)*(strlen(*nome)+1));
+			strcpylower(GLOBAL_DATA_SLCT.J.operator, *nome);
+			GLOBAL_DATA_SLCT.J.operator[strlen(*nome)] = '\0';
+		}
+		if (w == 2) {
+			GLOBAL_DATA_SLCT.J.rightPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
+			if (GLOBAL_DATA_SLCT.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.J.rightPredicate, *nome);
+			else strcpy(GLOBAL_DATA_SLCT.J.rightPredicate, *nome);
+			GLOBAL_DATA_SLCT.J.rightPredicate[strlen(*nome)] = '\0';
+			GLOBAL_DATA_SLCT.J.RPT = GLOBAL_DATA_SLCT.auxT;
+		}
 	}
 }
 
@@ -256,6 +288,37 @@ void clearGlobalStructs() {
             free(GLOBAL_DATA_SLCT.columnName[i]);
     }
     
+    if (GLOBAL_DATA_SLCT.joinObjName) {
+		free(GLOBAL_DATA_SLCT.joinObjName);
+        GLOBAL_DATA_SLCT.joinObjName = NULL;
+	}
+    
+	if (GLOBAL_DATA_SLCT.W.leftPredicate) {
+		free(GLOBAL_DATA_SLCT.W.leftPredicate);
+		GLOBAL_DATA_SLCT.W.leftPredicate = NULL;
+	}
+	if (GLOBAL_DATA_SLCT.W.rightPredicate) {
+		free(GLOBAL_DATA_SLCT.W.rightPredicate);
+		GLOBAL_DATA_SLCT.W.rightPredicate = NULL;
+	}
+	if (GLOBAL_DATA_SLCT.W.operator) {
+		free(GLOBAL_DATA_SLCT.W.operator);
+		GLOBAL_DATA_SLCT.W.operator = NULL;
+	}
+    
+	if (GLOBAL_DATA_SLCT.J.leftPredicate) {
+		free(GLOBAL_DATA_SLCT.J.leftPredicate);
+		GLOBAL_DATA_SLCT.J.leftPredicate = NULL;
+	}
+	if (GLOBAL_DATA_SLCT.J.rightPredicate) {
+		free(GLOBAL_DATA_SLCT.J.rightPredicate);
+		GLOBAL_DATA_SLCT.J.rightPredicate = NULL;
+	}
+	if (GLOBAL_DATA_SLCT.J.operator) {
+		free(GLOBAL_DATA_SLCT.J.operator);
+		GLOBAL_DATA_SLCT.J.operator = NULL;
+	}
+    
     free(GLOBAL_DATA_SLCT.columnName);
     GLOBAL_DATA_SLCT.columnName = NULL;
 
@@ -263,6 +326,8 @@ void clearGlobalStructs() {
 
     GLOBAL_DATA.N = 0;
     GLOBAL_DATA_SLCT.N = 0;
+    GLOBAL_DATA_SLCT.selecao = 0;
+    GLOBAL_DATA_SLCT.juncao = 0;
 
     GLOBAL_PARSER.mode              = 0;
     GLOBAL_PARSER.parentesis        = 0;

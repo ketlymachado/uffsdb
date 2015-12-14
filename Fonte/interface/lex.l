@@ -16,6 +16,8 @@
 (?i:SELECT)						return SELECT;
 (?i:FROM)						return FROM;
 (?i:WHERE)					return WHERE;
+(?i:JOIN)						return JOIN;
+(?i:ON)							return ON;
 (?i:CREATE)						return CREATE;
 (?i:TABLE)						return TABLE;
 (?i:INTEGER)					return INTEGER;

@@ -8,9 +8,9 @@
    ---------------------------------------------------------------------------------------------*/
 
 // Verifica se todas as colunas especificadas existem no esquema.
-int allColumnsExistsSelect(rc_select *s_select, tp_table *esquema);
+int allColumnsExistsSelect(rc_select *s_select, tp_table *esquema, tp_table *esquemaj);
 void makeAllPredicates(rc_select *s_select, tp_table *esquema);
-int existColumn(int D, rc_select *s_select, tp_table *esquema);
+int existColumn(int O, int D, rc_select *s_select, tp_table *esquema, tp_table *esquemaj);
 int onSelect(rc_select *s_select, char *nomecampo);
 int compatibleTypes(char t1, char t2, char *operator);
 int verifySimpleWhere(rc_select *s_select);
@@ -19,16 +19,24 @@ int verifyObjectWhere(rc_select *s_select, column *pg, int i, int L);
 void selectQ(rc_select *s_select) {
 
     int j, erro, x, p, cont=0, i, flag;
-    struct fs_objects objeto;
-
+    struct fs_objects objeto, objetoj;
+	tp_table *esquema, *esquemaj;
+	
     if (!verificaNomeTabela(s_select->objName)) {
         printf("\nERROR: relation \"%s\" was not found.\n\n\n", s_select->objName);
         return;
     }
-
+    
+    if (s_select->juncao && !verificaNomeTabela(s_select->joinObjName)) {
+        printf("\nERROR: relation \"%s\" was not found.\n\n\n", s_select->joinObjName);
+        return;
+    }
+	
     objeto = leObjeto(s_select->objName);
+    if (s_select->juncao) objetoj = leObjeto(s_select->joinObjName);
 
-    tp_table *esquema = leSchema(objeto);
+    esquema = leSchema(objeto);
+    if (s_select->juncao) esquemaj = leSchema(objetoj);
 
     if (esquema == ERRO_ABRIR_ESQUEMA) {
         printf("ERROR: schema cannot be created.\n");
@@ -36,37 +44,70 @@ void selectQ(rc_select *s_select) {
         return;
     }
     
+    if (s_select->juncao && esquemaj == ERRO_ABRIR_ESQUEMA) {
+        printf("ERROR: schema cannot be created.\n");
+        free(esquema);
+        free(esquemaj);
+        return;
+    }
+    
     if (strcmp(s_select->columnName[0], "*") == 0) {
 		makeAllPredicates(s_select, esquema);
 	}
     
-	if (!allColumnsExistsSelect(s_select, esquema)) {
+	if (!allColumnsExistsSelect(s_select, esquema, esquemaj)) {
         free(esquema);
+        free(esquemaj);
         return;
 	}
 	
-	if (s_select->W.LPT == 'O') {
-		if (!existColumn(0, s_select, esquema)) {
+	if (s_select->selecao && s_select->W.LPT == 'O') {
+		if (!existColumn(0, 0, s_select, esquema, esquemaj)) {
 			free(esquema);
+			free(esquemaj);
 			return;
 		}
 	}
 	
-	if (s_select->W.RPT == 'O') {
-		if (!existColumn(1, s_select, esquema)) {
+	if (s_select->selecao && s_select->W.RPT == 'O') {
+		if (!existColumn(0, 1, s_select, esquema, esquemaj)) {
 			free(esquema);
+			free(esquemaj);
 			return;
 		}
 	}
 	
-	if (!compatibleTypes(s_select->W.LPT, s_select->W.RPT, s_select->W.operator)) {
+	if (s_select->juncao && s_select->J.LPT == 'O') {
+		if (!existColumn(1, 0, s_select, esquema, esquemaj)) {
+			free(esquema);
+			free(esquemaj);
+			return;
+		}
+	}
+	
+	if (s_select->juncao && s_select->J.RPT == 'O') {
+		if (!existColumn(1, 1, s_select, esquema, esquemaj)) {
+			free(esquema);
+			free(esquemaj);
+			return;
+		}
+	}
+	
+	if (s_select->selecao && (!compatibleTypes(s_select->W.LPT, s_select->W.RPT, s_select->W.operator))) {
 		printf("ERROR: Invalid comparison.\n");
-		printf("%c %c\n", s_select->W.LPT, s_select->W.RPT);
 		free(esquema);
+		free(esquemaj);
 		return;
 	}
 	
-	if (s_select->W.LPT == 'A') {
+	if (s_select->juncao && (!compatibleTypes(s_select->J.LPT, s_select->J.RPT, s_select->J.operator))) {
+		printf("ERROR: Invalid comparison.\n");
+		free(esquema);
+		free(esquemaj);
+		return;
+	}
+	
+	if (s_select->selecao && s_select->W.LPT == 'A') {
 		int aux1;
 		for (aux1 = 0; aux1 < strlen(s_select->W.leftPredicate) - 2; aux1++) {
 			s_select->W.leftPredicate[aux1] = s_select->W.leftPredicate[aux1 + 1];
@@ -74,7 +115,15 @@ void selectQ(rc_select *s_select) {
 		s_select->W.leftPredicate[aux1] = '\0';
 	}
 	
-	if (s_select->W.RPT == 'A') {
+	if (s_select->juncao && s_select->J.LPT == 'A') {
+		int aux1;
+		for (aux1 = 0; aux1 < strlen(s_select->J.leftPredicate) - 2; aux1++) {
+			s_select->J.leftPredicate[aux1] = s_select->J.leftPredicate[aux1 + 1];
+		}
+		s_select->J.leftPredicate[aux1] = '\0';
+	}
+	
+	if (s_select->selecao && s_select->W.RPT == 'A') {
 		int aux1;
 		for (aux1 = 0; aux1 < strlen(s_select->W.rightPredicate) - 2; aux1++) {
 			s_select->W.rightPredicate[aux1] = s_select->W.rightPredicate[aux1 + 1];
@@ -82,11 +131,20 @@ void selectQ(rc_select *s_select) {
 		s_select->W.rightPredicate[aux1] = '\0';
 	}
 	
+	if (s_select->juncao && s_select->J.RPT == 'A') {
+		int aux1;
+		for (aux1 = 0; aux1 < strlen(s_select->J.rightPredicate) - 2; aux1++) {
+			s_select->J.rightPredicate[aux1] = s_select->J.rightPredicate[aux1 + 1];
+		}
+		s_select->J.rightPredicate[aux1] = '\0';
+	}
+	
     tp_buffer *bufferpoll = initbuffer();
 
     if (bufferpoll == ERRO_DE_ALOCACAO) {
         free(bufferpoll);
         free(esquema);
+        free(esquemaj);
         printf("ERROR: no memory available to allocate buffer.\n");
         return;
     }
@@ -104,6 +162,7 @@ void selectQ(rc_select *s_select) {
             printf("ERROR: could not open the table.\n");
             free(bufferpoll);
             free(esquema);
+            free(esquemaj);
             return;
 	    }
 
@@ -171,9 +230,10 @@ void selectQ(rc_select *s_select) {
 
     free(bufferpoll);
     free(esquema);
+    free(esquemaj);
 }
 
-int allColumnsExistsSelect(rc_select *s_select, tp_table *esquema) {
+int allColumnsExistsSelect(rc_select *s_select, tp_table *esquema, tp_table *esquemaj) {
 	int i;
 	if (!s_select->columnName) return 0;
 
@@ -185,8 +245,16 @@ int allColumnsExistsSelect(rc_select *s_select, tp_table *esquema) {
 			esquema = esquema->next;
 		}
 		if (esquema == NULL) {
-			printf("ERROR: column \"%s\" does not exist.\n", s_select->columnName[i]);
-			return 0;
+			while (esquemaj != NULL) {
+				if (strcmp(s_select->columnName[i], esquemaj->nome) == 0) {
+					break;
+				}
+				esquemaj = esquemaj->next;
+			}
+			if (esquemaj == NULL) {
+				printf("ERROR: column \"%s\" does not exist.\n", s_select->columnName[i]);
+				return 0;
+			}
 		}
 	}
 	return 1;
@@ -205,25 +273,74 @@ void makeAllPredicates(rc_select *s_select, tp_table *esquema) {
 	s_select->N = i;
 }
 
-int existColumn(int D, rc_select *s_select, tp_table *esquema) {
+int existColumn(int O, int D, rc_select *s_select, tp_table *esquema, tp_table *esquemaj) {
 	while (esquema != NULL) {
-		if (D == 0) {
-			if (strcmp(s_select->W.leftPredicate, esquema->nome) == 0) {
-				s_select->W.LPT = esquema->tipo;
-				break;
+		if (O == 0) {
+			if (D == 0) {
+				if (strcmp(s_select->W.leftPredicate, esquema->nome) == 0) {
+					s_select->W.LPT = esquema->tipo;
+					break;
+				}
+			} else {
+				if (strcmp(s_select->W.rightPredicate, esquema->nome) == 0) {
+					s_select->W.RPT = esquema->tipo;
+					break;
+				}
 			}
 		} else {
-			if (strcmp(s_select->W.rightPredicate, esquema->nome) == 0) {
-				s_select->W.RPT = esquema->tipo;
-				break;
+			if (D == 0) {
+				if (strcmp(s_select->J.leftPredicate, esquema->nome) == 0) {
+					s_select->J.LPT = esquema->tipo;
+					break;
+				}
+			} else {
+				if (strcmp(s_select->J.rightPredicate, esquema->nome) == 0) {
+					s_select->J.RPT = esquema->tipo;
+					break;
+				}
 			}
 		}
 		esquema = esquema->next;
 	}
 	if (esquema == NULL) {
-		if (D ==0) printf("ERROR: column \"%s\" does not exist.\n", s_select->W.leftPredicate);
-		else printf("ERROR: column \"%s\" does not exist.\n", s_select->W.rightPredicate);
-		return 0;
+		while (esquemaj != NULL) {
+			if (O == 0) {
+				if (D == 0) {
+					if (strcmp(s_select->W.leftPredicate, esquemaj->nome) == 0) {
+						s_select->W.LPT = esquemaj->tipo;
+						break;
+					}
+				} else {
+					if (strcmp(s_select->W.rightPredicate, esquemaj->nome) == 0) {
+						s_select->W.RPT = esquemaj->tipo;
+						break;
+					}
+				}
+			} else {
+				if (D == 0) {
+					if (strcmp(s_select->J.leftPredicate, esquemaj->nome) == 0) {
+						s_select->J.LPT = esquemaj->tipo;
+						break;
+					}
+				} else {
+					if (strcmp(s_select->J.rightPredicate, esquemaj->nome) == 0) {
+						s_select->J.RPT = esquemaj->tipo;
+						break;
+					}
+				}
+			}
+			esquemaj = esquemaj->next;
+		}
+		if (esquemaj == NULL) {
+			if (O == 0) {
+				if (D ==0) printf("ERROR: column \"%s\" does not exist.\n", s_select->W.leftPredicate);
+				else printf("ERROR: column \"%s\" does not exist.\n", s_select->W.rightPredicate);
+			} else {
+				if (D ==0) printf("ERROR: column \"%s\" does not exist.\n", s_select->J.leftPredicate);
+				else printf("ERROR: column \"%s\" does not exist.\n", s_select->J.rightPredicate);
+			}
+			return 0;
+		}
 	}
 	return 1;
 }

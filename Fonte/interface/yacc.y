@@ -23,7 +23,7 @@ int yywrap() {
     char *strval;
 }
 
-%token  INSERT      INTO        VALUES      SELECT      FROM      WHERE     COMPARISON
+%token  INSERT      INTO        VALUES      SELECT      FROM      WHERE     COMPARISON 		JOIN 		ON
         CREATE      TABLE       INTEGER     VARCHAR     DOUBLE
         CHAR        PRIMARY     KEY         REFERENCES  DATABASE
         DROP        OBJECT      NUMBER      VALUE       QUIT
@@ -150,7 +150,7 @@ create_database: CREATE DATABASE {setMode(OP_CREATE_DATABASE);} OBJECT {setObjNa
 drop_database: DROP DATABASE {setMode(OP_DROP_DATABASE);} OBJECT {setObjName(yytext);} semicolon {return 0;};
 
 /* SELECT */
-select: SELECT {setMode(OP_SELECT);} opt_columns_list FROM table_select opt_conditions_list semicolon {return 0;};
+select: SELECT {setMode(OP_SELECT);} opt_columns_list FROM table_select opt_join opt_condition semicolon {return 0;};
 
 opt_columns_list: '*' {setColumnSelect(yytext);} | columns_list;
 
@@ -160,14 +160,20 @@ columns: OBJECT {setColumnSelect(yytext);};
 
 table_select: OBJECT {setObjName(yytext);};
 
-opt_conditions_list: /*optional*/ {setWhere(0);}| WHERE {setWhere(1);} condition;
+opt_condition: /*optional*/ {setWhere(0);} | WHERE {setWhere(1);} condition;
 
-condition: predicate {setSelectCondition(0, yytext);} COMPARISON predicate {setSelectCondition(2, yytext);};
+condition: predicate {setSelectCondition(0, yytext);} COMPARISON predicate {setSelectCondition(2, yytext);} {setWhere(2);} ;
 
 predicate: OBJECT {setAuxT('O');}
 			| ALPHANUM {setAuxT('A');}
 			| VALUE {setAuxT('V');}
 			| NUMBER {setAuxT('N');};
+
+opt_join: /* optional */ {setJoin(0);} | JOIN {setJoin(1);} table_join ON join_condition;
+
+table_join: OBJECT {setJoinObjName(yytext);};
+
+join_condition: predicate {setSelectCondition(0, yytext);} COMPARISON predicate {setSelectCondition(2, yytext);};
 
 /* END */	
 %%

@@ -106,6 +106,10 @@ void setAuxT(char t);
 
 void setWhere(int x);
 
+void setJoin(int x);
+
+void setJoinObjName(char **nome);
+
 void setSelectCondition(int w, char **nome);
 
 /* Reinicializa todas as propriedades da estrutura que armazena

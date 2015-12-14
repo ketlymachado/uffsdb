@@ -90,15 +90,18 @@ typedef struct op_where {
 	char *rightPredicate;
 	char RPT;
 	char *operator;
-	char auxT;
 }op_where;
 
 typedef struct rc_select {
 	char *objName;
+	char *joinObjName;
     char **columnName;
     int N;
     int selecao;
+    int juncao;
+    char auxT;
     op_where W;
+    op_where J;
 }rc_select;
 
 // Union's utilizados na conversão de variáveis do tipo inteiro e double.

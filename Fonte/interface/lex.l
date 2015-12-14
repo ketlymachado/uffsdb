@@ -15,6 +15,7 @@
 (?i:VALUES)						return VALUES;
 (?i:SELECT)						return SELECT;
 (?i:FROM)						return FROM;
+(?i:WHERE)					return WHERE;
 (?i:CREATE)						return CREATE;
 (?i:TABLE)						return TABLE;
 (?i:INTEGER)					return INTEGER;
@@ -32,6 +33,13 @@ help							return HELP;
 [\\][h]+[^\n]*					{invalidCommand(yytext);};
 [\\][\?]						return HELP;
 (?i:CLEAR)						return CLEAR;
+
+(?i:"=")		|
+(?i:"<>")	|
+(?i:"<")		|
+(?i:">")		|
+(?i:"<=")	|
+(?i:">=") 	{setSelectCondition(1, &yytext);} return COMPARISON;
 
 [,]								return *yytext;
 [;]								return *yytext;

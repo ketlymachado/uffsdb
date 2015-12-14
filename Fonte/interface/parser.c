@@ -179,6 +179,36 @@ void setColumnSelect(char **nome) {
     GLOBAL_DATA_SLCT.N++;
 }
 
+void setAuxT(char t) {
+	GLOBAL_DATA_SLCT.W.auxT = t;
+}
+
+void setWhere(int x) {
+	GLOBAL_DATA_SLCT.selecao = x;
+}
+
+void setSelectCondition(int w, char **nome) {
+	if (w == 0) {
+		GLOBAL_DATA_SLCT.W.leftPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
+		if (GLOBAL_DATA_SLCT.W.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.W.leftPredicate, *nome);
+		else strcpy(GLOBAL_DATA_SLCT.W.leftPredicate, *nome);
+		GLOBAL_DATA_SLCT.W.leftPredicate[strlen(*nome)] = '\0';
+		GLOBAL_DATA_SLCT.W.LPT = GLOBAL_DATA_SLCT.W.auxT;
+	}
+	if (w == 1) {
+		GLOBAL_DATA_SLCT.W.operator = malloc(sizeof(char)*(strlen(*nome)+1));
+		strcpylower(GLOBAL_DATA_SLCT.W.operator, *nome);
+		GLOBAL_DATA_SLCT.W.operator[strlen(*nome)] = '\0';
+	}
+	if (w == 2) {
+		GLOBAL_DATA_SLCT.W.rightPredicate = malloc(sizeof(char)*(strlen(*nome)+1));
+		if (GLOBAL_DATA_SLCT.W.auxT == 'O') strcpylower(GLOBAL_DATA_SLCT.W.rightPredicate, *nome);
+		else strcpy(GLOBAL_DATA_SLCT.W.rightPredicate, *nome);
+		GLOBAL_DATA_SLCT.W.rightPredicate[strlen(*nome)] = '\0';
+		GLOBAL_DATA_SLCT.W.RPT = GLOBAL_DATA_SLCT.W.auxT;
+	}
+}
+
 void clearGlobalStructs() {
     int i;
 
@@ -279,13 +309,10 @@ int interface() {
                             else
                                 printf("WARNING: Nothing to be inserted. Command ignored.\n");
                             break;
-                        case OP_SELECT_ALL:
-                            imprime(GLOBAL_DATA.objName);
-                            break;
                         case OP_SELECT:
 							if (GLOBAL_DATA_SLCT.N > 0) {
                                 selectQ(&GLOBAL_DATA_SLCT);
-                            } 
+                            }
                             else
                                 printf("WARNING: Nothing to be selected. Command ignored.\n");
                             break;
@@ -313,7 +340,6 @@ int interface() {
                 case OP_DROP_DATABASE:
                 case OP_CREATE_TABLE:
                 case OP_DROP_TABLE:
-                case OP_SELECT_ALL:
                 case OP_INSERT:
                     if (GLOBAL_PARSER.step == 1) {
                         GLOBAL_PARSER.consoleFlag = 0;

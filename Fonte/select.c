@@ -9,11 +9,16 @@
 
 // Verifica se todas as colunas especificadas existem no esquema.
 int allColumnsExistsSelect(rc_select *s_select, tp_table *esquema);
+void makeAllPredicates(rc_select *s_select, tp_table *esquema);
+int existColumn(int D, rc_select *s_select, tp_table *esquema);
 int onSelect(rc_select *s_select, char *nomecampo);
+int compatibleTypes(char t1, char t2, char *operator);
+int verifySimpleWhere(rc_select *s_select);
+int verifyObjectWhere(rc_select *s_select, column *pg, int i, int L);
 
 void selectQ(rc_select *s_select) {
 
-    int j,erro, x, p, cont=0, i, flag;
+    int j, erro, x, p, cont=0, i, flag;
     struct fs_objects objeto;
 
     if (!verificaNomeTabela(s_select->objName)) {
@@ -30,10 +35,51 @@ void selectQ(rc_select *s_select) {
         free(esquema);
         return;
     }
-
+    
+    if (strcmp(s_select->columnName[0], "*") == 0) {
+		makeAllPredicates(s_select, esquema);
+	}
+    
 	if (!allColumnsExistsSelect(s_select, esquema)) {
         free(esquema);
         return;
+	}
+	
+	if (s_select->W.LPT == 'O') {
+		if (!existColumn(0, s_select, esquema)) {
+			free(esquema);
+			return;
+		}
+	}
+	
+	if (s_select->W.RPT == 'O') {
+		if (!existColumn(1, s_select, esquema)) {
+			free(esquema);
+			return;
+		}
+	}
+	
+	if (!compatibleTypes(s_select->W.LPT, s_select->W.RPT, s_select->W.operator)) {
+		printf("ERROR: Invalid comparison.\n");
+		printf("%c %c\n", s_select->W.LPT, s_select->W.RPT);
+		free(esquema);
+		return;
+	}
+	
+	if (s_select->W.LPT == 'A') {
+		int aux1;
+		for (aux1 = 0; aux1 < strlen(s_select->W.leftPredicate) - 2; aux1++) {
+			s_select->W.leftPredicate[aux1] = s_select->W.leftPredicate[aux1 + 1];
+		}
+		s_select->W.leftPredicate[aux1] = '\0';
+	}
+	
+	if (s_select->W.RPT == 'A') {
+		int aux1;
+		for (aux1 = 0; aux1 < strlen(s_select->W.rightPredicate) - 2; aux1++) {
+			s_select->W.rightPredicate[aux1] = s_select->W.rightPredicate[aux1 + 1];
+		}
+		s_select->W.rightPredicate[aux1] = '\0';
 	}
 	
     tp_buffer *bufferpoll = initbuffer();
@@ -87,6 +133,18 @@ void selectQ(rc_select *s_select) {
 	    cont++;
 	    for (i=0; i < bufferpoll[p].nrec; i++) {
 			flag = 1;
+			if (s_select->selecao) {
+				if (s_select->W.LPT == 'I' || s_select->W.LPT == 'D' || s_select->W.LPT == 'S' || s_select->W.LPT == 'C' ||
+					s_select->W.RPT == 'I' || s_select->W.RPT == 'D' || s_select->W.RPT == 'S' || s_select->W.RPT == 'C') {
+					if (!verifyObjectWhere(s_select, pagina, i, objeto.qtdCampos)) {
+						ntuples--;
+						continue;
+					}
+				} else if (!verifySimpleWhere(s_select)) {
+					ntuples--;
+					continue;
+				}
+			}
 			for (j=0; j < objeto.qtdCampos; j++) {
 				int jj = j + (i * objeto.qtdCampos);
 				if (onSelect(s_select, pagina[jj].nomeCampo)) {
@@ -134,10 +192,181 @@ int allColumnsExistsSelect(rc_select *s_select, tp_table *esquema) {
 	return 1;
 }
 
+void makeAllPredicates(rc_select *s_select, tp_table *esquema) {
+	int i = 0;
+	while (esquema != NULL) {
+		s_select->columnName = realloc(s_select->columnName, (i + 1)*sizeof(char *));
+		s_select->columnName[i] = malloc(sizeof(char)*(strlen(esquema->nome)+1));
+		strcpy(s_select->columnName[i], esquema->nome);
+		s_select->columnName[i][strlen(esquema->nome)] = '\0';
+		esquema = esquema->next;
+		i++;
+	}
+	s_select->N = i;
+}
+
+int existColumn(int D, rc_select *s_select, tp_table *esquema) {
+	while (esquema != NULL) {
+		if (D == 0) {
+			if (strcmp(s_select->W.leftPredicate, esquema->nome) == 0) {
+				s_select->W.LPT = esquema->tipo;
+				break;
+			}
+		} else {
+			if (strcmp(s_select->W.rightPredicate, esquema->nome) == 0) {
+				s_select->W.RPT = esquema->tipo;
+				break;
+			}
+		}
+		esquema = esquema->next;
+	}
+	if (esquema == NULL) {
+		if (D ==0) printf("ERROR: column \"%s\" does not exist.\n", s_select->W.leftPredicate);
+		else printf("ERROR: column \"%s\" does not exist.\n", s_select->W.rightPredicate);
+		return 0;
+	}
+	return 1;
+}
+
 int onSelect(rc_select *s_select, char *nomecampo) {
 	int i;
 	for (i = 0; i < s_select->N; i++) {
 		if (strcmp(s_select->columnName[i], nomecampo) == 0) return 1;
 	}
+	return 0;
+}
+
+int compatibleTypes(char t1, char t2, char *operator) {
+	if (t1 == t2) return 1;
+	if (t1 == 'D' && t2 == 'I') return 1;
+	if (t1 == 'I' && t2 == 'D') return 1;
+	if (t1 == 'S' && t2 == 'C' && ( strcmp(operator, "=") == 0 || strcmp(operator, "<>") == 0 ) ) return 1;
+	if (t1 == 'C' && t2 == 'S' && ( strcmp(operator, "=") == 0 || strcmp(operator, "<>") == 0 ) ) return 1;
+	if (t1 == 'C' && t2 == 'A' && ( strcmp(operator, "=") == 0 || strcmp(operator, "<>") == 0 ) ) return 1;
+	if (t1 == 'A' && t2 == 'C' && ( strcmp(operator, "=") == 0 || strcmp(operator, "<>") == 0 ) ) return 1;
+	if (t1 == 'S' && t2 == 'A' && ( strcmp(operator, "=") == 0 || strcmp(operator, "<>") == 0 ) ) return 1;
+	if (t1 == 'A' && t2 == 'S' && ( strcmp(operator, "=") == 0 || strcmp(operator, "<>") == 0 ) ) return 1;
+	if (t1 == 'D' && t2 == 'V') return 1;
+	if (t1 == 'V' && t2 == 'D') return 1;
+	if (t1 == 'I' && t2 == 'V') return 1;
+	if (t1 == 'V' && t2 == 'I') return 1;
+	if (t1 == 'N' && t2 == 'V') return 1;
+	if (t1 == 'V' && t2 == 'N') return 1;
+	if (t1 == 'D' && t2 == 'N') return 1;
+	if (t1 == 'N' && t2 == 'D') return 1;
+	if (t1 == 'I' && t2 == 'N') return 1;
+	if (t1 == 'N' && t2 == 'I') return 1;
+	return 0;
+}
+
+int respectConditionN(double a, double b, char *condition) {
+	if (strcmp(condition, "=") == 0) return !compDtoD(a, b);
+	else if (strcmp(condition, "<>") == 0) return compDtoD(a, b);
+	else if (strcmp(condition, "<") == 0) return a < b;
+	else if (strcmp(condition, ">") == 0) return a > b;
+	else if (strcmp(condition, ">=") == 0) return ((a > b) || (!compDtoD(a, b)));
+	else if (strcmp(condition, "<=") == 0) return ((a < b) || (!compDtoD(a, b)));
+	return 0;
+}
+
+int verifySimpleWhere(rc_select *s_select) {
+	double a, b;
+	if (s_select->W.LPT == 'N' || s_select->W.LPT == 'V') {
+		a = atof(s_select->W.leftPredicate);
+		b = atof(s_select->W.rightPredicate);
+		return (respectConditionN(a, b, s_select->W.operator));
+	}
+	return ( !strcmp(s_select->W.leftPredicate, s_select->W.rightPredicate) && strcmp(s_select->W.operator, "=") == 0)
+			|| ( strcmp(s_select->W.leftPredicate, s_select->W.rightPredicate) && strcmp(s_select->W.operator, "=") != 0);
+}
+
+int verifyObjectWhere(rc_select *s_select, column *pg, int i, int L) {
+	
+	int j, aux1, jj;
+	double a, b;
+	
+	if (s_select->W.LPT == 'N' || s_select->W.LPT == 'V') {
+		a = atof(s_select->W.leftPredicate);
+		for (j=0; j < L; j++) {
+			jj = j + (i * L);
+			if (strcmp(pg[jj].nomeCampo, s_select->W.rightPredicate) == 0) {
+				if (pg[jj].tipoCampo == 'I') {
+					aux1 = *(int *) pg[jj].valorCampo;
+					b = aux1;
+				} else b = *(double *)pg[jj].valorCampo;
+				break;
+			}
+		}
+		return (respectConditionN(a, b, s_select->W.operator));
+	}
+	if (s_select->W.RPT == 'N' || s_select->W.RPT == 'V') {
+		a = atof(s_select->W.rightPredicate);
+		for (j=0; j < L; j++) {
+			jj = j + (i * L);
+			if (strcmp(pg[jj].nomeCampo, s_select->W.leftPredicate) == 0) {
+				if (pg[jj].tipoCampo == 'I') {
+					aux1 = *(int *) pg[jj].valorCampo;
+					b = aux1;
+				} else b = *(double *)pg[jj].valorCampo;
+				break;
+			}
+		}
+		return (respectConditionN(b, a, s_select->W.operator));
+	}
+	
+	if (s_select->W.LPT == 'A') {
+		for (j=0; j < L; j++) {
+			jj = j + (i * L);
+			if (strcmp(pg[jj].nomeCampo, s_select->W.rightPredicate) == 0) break;
+		}
+		return ( !strcmp(s_select->W.leftPredicate, pg[jj].valorCampo) && strcmp(s_select->W.operator, "=") == 0)
+				|| ( strcmp(s_select->W.leftPredicate, pg[jj].valorCampo) && strcmp(s_select->W.operator, "=") != 0);
+	}
+	
+	if (s_select->W.RPT == 'A') {
+		for (j=0; j < L; j++) {
+			jj = j + (i * L);
+			if (strcmp(pg[jj].nomeCampo, s_select->W.leftPredicate) == 0) break;
+		}
+		return ( !strcmp(s_select->W.rightPredicate, pg[jj].valorCampo) && strcmp(s_select->W.operator, "=") == 0)
+				|| ( strcmp(s_select->W.rightPredicate, pg[jj].valorCampo) && strcmp(s_select->W.operator, "=") != 0);
+	}
+	
+	for (j=0; j < L; j++) {
+		jj = j + (i * L);
+		if (strcmp(pg[jj].nomeCampo, s_select->W.leftPredicate) == 0) {
+			if (pg[jj].tipoCampo == 'I') {
+				aux1 = *(int *) pg[jj].valorCampo;
+				a = aux1;
+				for (j=0; j < L; j++) {
+					jj = j + (i * L);
+					if (strcmp(pg[jj].nomeCampo, s_select->W.rightPredicate) == 0) {
+						aux1 = *(int *) pg[jj].valorCampo;
+						b = aux1;
+						return (respectConditionN(a, b, s_select->W.operator));
+					}
+				}
+			} else if (pg[jj].tipoCampo == 'D') {
+				a = *(double *) pg[jj].valorCampo;
+				for (j=0; j < L; j++) {
+					jj = j + (i * L);
+					if (strcmp(pg[jj].nomeCampo, s_select->W.rightPredicate) == 0) {
+						b = *(double *) pg[jj].valorCampo;
+						return (respectConditionN(a, b, s_select->W.operator));
+					}
+				}
+			} else {
+				int k = jj;
+				for (j=0; j < L; j++) {
+					jj = j + (i * L);
+					if (strcmp(pg[jj].nomeCampo, s_select->W.rightPredicate) == 0) {
+						return ( !strcmp(pg[k].valorCampo, pg[jj].valorCampo) && strcmp(s_select->W.operator, "=") == 0)
+						|| ( strcmp(pg[k].valorCampo, pg[jj].valorCampo) && strcmp(s_select->W.operator, "=") != 0);
+					}
+				}
+			}
+		}
+	}
+	
 	return 0;
 }

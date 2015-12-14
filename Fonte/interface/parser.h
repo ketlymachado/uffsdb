@@ -8,8 +8,7 @@
 #define OP_DROP_TABLE 		3
 #define OP_CREATE_DATABASE 	4
 #define OP_DROP_DATABASE 	5
-#define OP_SELECT_ALL 		6
-#define OP_SELECT			7
+#define OP_SELECT			6
 
 /* Estrutura global que guarda as informações obtidas pelo yacc
  * na identificação dos tokens
@@ -102,6 +101,12 @@ void setColumnFKColumnCreate(char **nome);
  * comando SELECT.
  */
 void setColumnSelect(char **nome);
+
+void setAuxT(char t);
+
+void setWhere(int x);
+
+void setSelectCondition(int w, char **nome);
 
 /* Reinicializa todas as propriedades da estrutura que armazena
  * os dados identificados pelos tokens SQL.

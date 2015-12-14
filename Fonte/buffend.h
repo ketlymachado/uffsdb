@@ -84,10 +84,21 @@ typedef struct db_connected {
     int conn_active;
 }db_connected;
 
+typedef struct op_where {
+	char *leftPredicate;
+	char LPT;
+	char *rightPredicate;
+	char RPT;
+	char *operator;
+	char auxT;
+}op_where;
+
 typedef struct rc_select {
 	char *objName;
     char **columnName;
     int N;
+    int selecao;
+    op_where W;
 }rc_select;
 
 // Union's utilizados na conversão de variáveis do tipo inteiro e double.
